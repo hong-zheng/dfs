@@ -1,0 +1,906 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <algorithm>
+
+using namespace std;
+
+
+#include <unordered_map>
+void zhenghong(){
+	cout << "zhenghong  start" << endl;
+
+	cout << "zhenghong  end" << endl;
+}
+
+// 
+void merge(int* arr, int left, int right, int* tmp){
+	if (left >= right){
+		return;
+	}
+
+	int mid = left + (right - left) / 2;
+
+	// [left,mid]
+	// [mid+1,right]
+
+	merge(arr, left, mid, tmp);
+	merge(arr, mid + 1, right, tmp);
+
+	int begin1 = left, end1 = mid;
+	int begin2 = right, end2 = right;
+	int index = left;
+
+	while (begin1 <= end1&&begin2 <= end2){
+		if (arr[begin1] < arr[begin2]){
+			tmp[index++] = arr[begin1++];
+		}
+		else{
+			tmp[index++] = arr[begin2++];
+		}
+	}
+
+	while (begin1 <= end1){
+		tmp[index++] = arr[begin1++];
+	}
+
+	while (begin2 <= end2){
+		tmp[index++] = arr[begin2++];
+	}
+
+	memcpy(arr + left, tmp + left, sizeof(int)*(right - left
+		+ 1));
+}
+
+// 内存泄漏，内存泄漏的危害
+//什么是内存泄漏，内存泄漏的危害？
+// 内存泄漏指因为疏忽造成程序未能释放已经不再使用的内存的情况。
+// 内存泄漏并不是指内存在物理上的消失，而是应用程序分配某段内存后，
+// 因为设计错误，失去了对该内存的控制，因而造成了内存的消费
+
+//  危害：长期运行的程序出现内存泄漏，影响很大，如操作系统、后台服务器等，出现内存泄漏会导致响应越来越慢，最终卡死.
+
+// 内存泄漏分类：
+// C/C++程序中一般的内存泄漏：
+// 1、堆内存泄漏（heap leak)
+// 堆内存指的是程序执行中依赖要分配通过 malloc / realloc / new  等从堆中分配一块内存，用完后必须通过调用相应的free或者delete删除。假设程序的设计错误导致这部分内存没有被释放，那么以后这部分空间将无法再被使用，就会产生heap leak
+// 系统资源泄漏：
+// 指程序使用系统分配的资源，比方套接字、文件描述符管道等设计没有对应的函数释放掉，导致内存资源的浪费，严重可导致系统效能减少，系统执行不稳定
+
+
+/*
+// 使用 RAII 思想设计的 SmartPtr 类
+template <class T>
+class SmartPtr{
+public:
+	SmartPtr(T* ptr = nullptr)
+		:_ptr(ptr)
+	{}
+	~SmartPtr()
+	{
+		if (_ptr)
+			delete _ptr;
+	}
+private:
+	T* _ptr;
+};
+void Merge(int* arr, int n){
+	int* tmp = (int*)malloc(sizeof(int)*n);
+	SmartPtr<int> sp(tmp); // 将malloc的指针tmp初始化给sp，程序结束的时候，sp的生命周期自动结束
+}
+
+template<class T>
+class SmartPtrN{
+public:
+	SmartPtrN(T* ptr = nullptr)
+	:_ptr(ptr)
+	{}
+
+	~SmartPtrN()
+	{
+		if (_ptr)
+			delete _ptr;
+	}
+
+	T& operator*(){
+		return *_ptr;
+	}
+
+	T* operator->(){
+		return _ptr;
+	}
+private:
+	T* _ptr;
+};
+
+struct Date{
+	int _year;
+	int month;
+	int day;
+};
+
+void t(){
+	SmartPtrN<int> sp(new int);
+	*sp = 10;
+
+	cout << *sp << endl;
+
+	SmartPtrN<Date> spa(new Date);
+
+	spa->_year = 100;
+	spa->month = 10;
+	spa->day = 3;
+}
+
+// 总结指针指针的原理：
+//1、RAII特性
+//2、重载operator*和operator->，具有像指针一样的行为
+#include <memory>
+
+class DateN{
+public:
+	DateN(){
+		cout << "DateN()" << endl;
+	}
+	~DateN()
+	{
+		cout << "~DateN()" << endl;
+	}
+	int _year;
+	int _month;
+	int _day;
+};
+void testAutoPtr(){
+	// auto_ptr 指针的使用及其问题
+	auto_ptr<DateN> ap(new DateN);
+	auto_ptr<DateN> copy(ap);
+
+	// 
+}
+
+// auto_ptr 实现原理：管理权转移的思想
+template<class T>
+class AutoPtr{
+public:
+	AutoPtr(T* ptr = nullptr)
+		:_ptr(ptr)
+	{	}
+
+	~AutoPtr()
+	{
+		if (_ptr)
+			delete _ptr;
+	}
+
+	// 一旦发生拷贝，就将ap中的资源移到当前对象中，然后另ap与其所管理资源断开联系
+	// 这样就解决了一块空间被多个对象使用而造成程序崩溃问题
+	AutoPtr(AutoPtr<T>& ap)
+		:_ptr(ap._ptr)
+	{
+		ap._ptr = nullptr;
+	}
+	
+	AutoPtr<T>& operator=(AutoPtr<T>& ap){
+		// 检测是否为自己给自己赋值
+		if (this != &ap){
+			// 释放当前对象中的资源
+			if (_ptr){
+				delete _ptr;
+			}
+
+			// 转移ap中资源到当前对象中
+			_ptr = ap._ptr;
+			ap._ptr = nullptr;
+		}
+		return *this;
+	}
+
+	T* operator->(){
+		return _ptr;
+	}
+
+	T& operator*(){
+		return *_ptr;
+	}
+private:
+	T* _ptr;
+};
+
+void testAutoPtr(){
+	AutoPtr<Date> ap(new Date);
+
+	// 现在再从实现原理层来分析会发现，这里拷贝后把ap对象的指针赋空了，导致ap对象悬空
+	// 通过ap对象访问资源时就会出现问题
+	AutoPtr<Date> copy(ap);
+
+	// ap->_year = 2018;
+}
+
+
+
+
+
+
+
+
+template<class T>
+class Auto_Ptr{
+public:
+	Auto_Ptr(T* ptr = nullptr)
+		:_ptr(ptr){
+	}
+	~Auto_Ptr()
+	{
+		if (_ptr)
+			delete _ptr;
+	}
+
+	// 赋值构造
+	Auto_Ptr<T>& operator=(Auto_Ptr<T>& ap){
+		if (this != ap){
+			
+			//先将自己的释放
+			if (_ptr)
+				delete _ptr;
+			
+			_ptr = ap._ptr;
+			ap._ptr = nullptr;
+
+		}
+		return *this;
+	}
+
+	// 拷贝构造
+	Auto_Ptr(Auto_Ptr<T>& ap)
+		:_ptr(ap._ptr)
+	{
+		ap._ptr = nullptr;
+	}
+private:
+	T* _ptr;
+};
+
+// std::unique_ptr
+// 开始提供更为靠谱的 unique_ptr
+
+// 模拟实现一份简单的UniquePtr，
+template<class T>
+class UniquePtr{
+public:
+	UniquePtr(T* ptr =nullptr)
+		:_ptr(ptr){}
+
+	~UniquePtr()
+	{
+		if (_ptr)
+			delete _ptr;
+	}
+
+	T& operator*(){
+		return *_ptr;
+	}
+
+	T* operator->(){
+		return _ptr;
+	}
+
+private:
+	// C++98 防拷贝的方式：只声明不实现+声明成私有
+	UniquePtr(UniquePtr<T> const &);
+	UniquePtr& operator=(UniquePtr<T> const &);
+
+	// C++11 防拷贝的方式:delete
+	UniquePtr(UniquePtr<T> const &) = delete;
+	UniquePtr& operator=(UniquePtr<T> const &) = delete;
+private:
+	T* _ptr;
+};
+
+
+void testUnique(){
+	unique_ptr<Date> up(new Date);
+
+	// 设计思路非常简单粗暴-防拷贝，也就是不让拷贝和赋值
+	// unique_ptr<Date> copy(up) ;
+}
+
+// shared_ptr 原理：是通过引用
+
+void testshared(){
+	// shared_ptr 通过引用计数智能指针对象的拷贝
+	shared_ptr<Date> sp(new Date);
+	shared_ptr<Date> copy(sp);
+
+	cout << "ref:count : " << sp.use_count() << endl;
+	cout << "ref:count : " << copy.use_count() << endl;
+}
+*/
+/*
+	shared_ptr的原理：是通过引用计数的方式来实现多个shared_ptr对象之间共享资源.
+	1、shared_ptr 在其内部，给每个资源都维护者一份技术，用来记录该份资源被几个对象共享
+	2、在对象被销毁时（也就是析构函数调用），就说明了自己不使用该资源，对象的引用计数减1
+	3、如果引用计数是0，就说明自己是最后一个使用该资源的对象，必须释放该资源
+	4、如果不是0，就说明除了自己还有其他对象在使用该份资源，不能释放该资源，否则其他对象就成野指针.
+*/
+/*
+#include <thread>
+#include <mutex>
+template<class T>
+class Shared_Ptr{
+public:
+	Shared_Ptr(T* ptr = nullptr)
+		:_ptr(ptr)
+		, _pRefCount(new int(1))
+		, _pMutex(new mutex){}
+
+	~Shared_Ptr()
+	{
+		Release();
+	}
+
+	Shared_Ptr(const Shared_Ptr<T>& sp)
+		:_ptr(sp._ptr)
+		, _pRefCount(sp._pRefCount)
+		, _pMutex(sp._pMutex){
+			AddRefCount();
+	}
+private:
+	void Release(){
+		bool deleteFlag = false;
+
+		// 引用计数减1，如果减到0，则释放资源
+
+		_pMutex.lock();
+		
+		if (--(*_pRefCount) == 0){
+			delete _ptr;
+			delete _pRefCount;
+			deleteflag = true;
+		}
+
+		_pMutex.unlock();
+		
+		if (deleteFlag == true){
+			delete _pMutex;
+		}
+	}
+private:
+	int* _pRefCount; // 引用计数
+	T* _ptr;
+	mutex* _pMutex;
+};
+
+*/
+
+
+#include <iostream>
+#include <algorithm>
+using namespace std;
+
+void t(){
+	cout << "t() start" << endl;
+
+
+
+	cout << "t() end" << endl;
+}
+
+
+#include <thread>
+#include <mutex>
+
+template<class T>
+class Shared_Ptr{
+public:
+
+ //管理资源的构造函数
+	// ptr ：指向资源
+	Shared_Ptr(T* ptr =nullptr)
+		:_ptr(ptr)
+		, _pMutex(new mutex)
+		, _pRefCount(new int(1)){}
+
+	~Shared_Ptr()
+	{
+		Release();
+	}
+
+	Shared_Ptr(const Shared_Ptr<T>& sp)
+		:_ptr(sp._ptr)
+		, _pRefCount(sp._pRefCount)
+		, _pMutex(sp._pMutex){
+		AddRefCount();
+	}
+
+	// sp1 == sp2
+	Shared_Ptr<T>& operator=(const Shared_Ptr<T>& sp){
+		if (_ptr != sp._ptr){
+			// 释放管理的旧资源
+			Release();
+			// 共享管理新对象的资源，并增加引用计数
+			_ptr = sp._ptr;
+			_pRefCount = sp._pRefCount;
+			_pMutex = sp._pMutex;
+
+			AddRefCount();
+		}
+
+		return *this;
+	}
+
+	T& operator*(){
+		return *_ptr;
+	}
+	T* operator->(){
+		return _ptr;
+	}
+
+	int UseCount(){
+		return *_pRefCount;
+	}
+
+	T* Get(){
+		return _ptr;
+	}
+private:
+
+	void AddRefCount(){
+		// 加锁或者使用加1的原子操作
+		_pMutex->lock();
+		++(*_pRefCount);
+		_pMutex->unlock();
+	}
+
+	void Release() {
+		bool deleteFlag = false;
+
+		// 引用计数减 1 ， 如果减到 0 ， 则释放资源
+		_pMutex->lock();
+
+		// 对引用计数的释放需要加锁
+		if (--(*_pRefCount) == 0){
+			delete _ptr;
+			delete _pRefCount;
+			deleteFlag = true;
+		}
+
+		_pMutex->unlock();
+
+		if (deleteFlag)
+			delete _pMutex;
+	}
+private:
+	T* _ptr; // 指向管理资源的指针
+	int* _pRefCount; // 引用计数
+	mutex* _pMutex; // 互斥锁
+};
+
+void testSharedPtr(){
+	Shared_Ptr<int> sp1(new int(10));
+	Shared_Ptr<int> sp2(sp1);
+
+	*sp2 = 20;
+	cout << sp1.UseCount() << endl;
+}
+int mainqqq(){
+
+
+	testSharedPtr();
+//	t();
+
+
+
+	unordered_map<int, int> umi;
+	auto val = umi.begin();
+	for (auto e : umi){
+		cout << e.first << e.second << endl;
+	}
+	bool a = nullptr;
+
+	// 对象 b 不存在，不能用于初始化 int 类实体对象
+	//int b = nullptr;
+	//zhenghong();
+	//	t();
+	//tst();
+	//	testSignle();
+	//	testPtr();
+	//	testLingXing();
+	system("pause");
+	return 0;
+}
+/*
+	智能指针对象中引用计数是多个智能指针对象共享的，两个线程中智能指针的引用计数同时++或者--，这个操作不是原子的，引用计数原来是1
+	++了两次，可能还是2.这样引用计数就乱了.
+*/
+#include <string>
+
+
+
+void createN(int N, vector<vector<int>>& output){
+	int n = 1;
+	int x = 0;
+	int y = 0;
+	int NN = N;
+	int SS = 0;
+	bool flag = 1;
+	while (n <= N*N){
+		if (flag){
+			while (y<NN && !output[x][y]){
+				output[x][y++] = n++;
+			}
+			y--;
+			x++;
+			while (x<NN && !output[x][y]){
+				output[x++][y] = n++;
+			}
+			x--;
+			y--;
+			while (y >= SS && !output[x][y]){
+				output[x][y--] = n++;
+			}
+			y++;
+			x--;
+			while (x >= SS + 1 && !output[x][y]){
+				output[x--][y] = n++;
+			}
+			x++;
+			y++;
+		}
+		else{
+			while (x < NN&&!output[x][y]){
+				output[x++][y] = n++;
+			}
+			--x;
+			++y;
+			while (y < NN&&!output[x][y]){
+				output[x][y++] = n++;
+			}
+			--y;
+			--x;
+			while (x >= SS&&!output[x][y]){
+				output[x--][y] = n++;
+			}
+			++x;
+			--y;
+			while (y >= SS&&!output[x][y]){
+				output[x][y--] = n++;
+			}
+			++y;
+			++x;
+		}
+		NN--;
+		SS++;
+		flag = !flag;
+	}
+}
+void tt(){
+	int N = 7;
+	vector<vector<int>> output(N, vector<int>(N, 0));
+	createN(N, output);
+	for (int i = 0; i < N; ++i){
+		for (int j = 0; j < N; ++j){
+			printf("%-3d  ", output[i][j]);
+		}
+		cout << endl;
+	}
+}
+#include <map>
+
+int maiddn(){
+
+	map<string, int> msi;
+	msi.erase("zhenghong");
+	// tt();
+	string open = "open zhenghong";
+	size_t pos = open.find(' ');
+	
+	cout << open.substr(0, pos);
+	string s = open.substr(0, pos);
+	// 为0就是相等
+	cout << strcmp(s.c_str(),"open") << endl;
+	//cout << "zhenghong" << endl;
+	system("pause");
+	return 0;
+}
+
+/*
+
+#include <iostream>
+#include <vector>
+using namespace std ;
+
+void createN(int N, vector<vector<int>>& output){
+int n = 1;
+int x = 0;
+int y = 0;
+int NN = N;
+int SS = 0;
+bool flag = 1;
+while (n <= N*N){
+if (flag){
+while (y<NN && !output[x][y]){
+output[x][y++] = n++;
+}
+y--;
+x++;
+while (x<NN && !output[x][y]){
+output[x++][y] = n++;
+}
+x--;
+y--;
+while (y >= SS && !output[x][y]){
+output[x][y--] = n++;
+}
+y++;
+x--;
+while (x >= SS + 1 && !output[x][y]){
+output[x--][y] = n++;
+}
+x++;
+y++;
+}
+else{
+while (x < NN&&!output[x][y]){
+output[x++][y] = n++;
+}
+--x;
+++y;
+while (y < NN&&!output[x][y]){
+output[x][y++] = n++;
+}
+--y;
+--x;
+while (x >= SS&&!output[x][y]){
+output[x--][y] = n++;
+}
+++x;
+--y;
+while (y >= SS&&!output[x][y]){
+output[x][y--] = n++;
+}
+++y;
+++x;
+}
+NN--;
+SS++;
+flag = !flag;
+}
+}
+
+int main(){
+int C = 0 ;
+cin>>C ;
+while(C--){
+// N：正方形维度
+// M: 需要查询的数据组数
+int N = 0 ;
+int M = 0 ;
+cin>>N>>M ;
+
+vector<vector<int>> ret(M,vector<int>(2,0)) ;
+for(int i = 0 ; i<M ; ++i){
+for(int j = 0 ; j < 2 ; ++j){
+cin>>ret[i][j] ;
+}
+}
+vector<vector<int>> output(N,vector<int>(N,0)) ;
+createN(N,output) ;
+
+for(int i = 0 ; i < M ; ++i){
+cout<<output[ret[i][0]][ret[i][1]]<<endl ;
+}
+}
+return 0 ;
+}
+
+*/
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <map>
+
+using namespace std;
+/*
+open libc.so
+open libm.so
+open libd1.so
+dup 2
+dup2 0 2
+*/
+int mainwe(){
+	int T = 0;
+	cin >> T;
+	while (T--){
+		int N = 0;// 一个几个命令
+		cin >> N;
+		vector<string> cmd;
+		int ii = 0;
+		while (N--){
+			string ss;
+			getline(cin, ss);
+			cmd.push_back(ss);
+		}
+		int opennum = 0;
+		map<int, string> msi;
+		for (int i = 0; i<N; ++i){
+			cout << "start" << endl;
+			string str = cmd[i];
+			size_t pos = str.find(' ');
+			string s = str.substr(0, pos);
+
+			// 处理 open 打开文件
+			// 为0就是相等
+			if (!strcmp(s.c_str(), "open")){
+				cout << opennum << endl;
+				msi[opennum] = str.substr(pos + 1);
+				opennum++;
+			}
+
+			if (!strcmp(s.c_str(), "query")){
+				pos = pos + 1;
+				int key = str[pos] - '0';
+				cout << msi[key] << endl;
+			}
+
+			if (!strcmp(s.c_str(), "close")){
+				pos = pos + 1;
+				int key = str[pos] - '0';
+				msi.erase(key);
+			}
+			if (!strcmp(s.c_str(), "dup")){
+				cout << opennum << endl;
+				msi[opennum] = s;
+				opennum++;
+			}
+			if (!strcmp(s.c_str(), "dup2")){
+				int f = str[pos + 1] - '0';
+				int l = str[pos + 3] - '0';
+				msi[l] = msi[f];
+			}
+		}
+	}
+	system("pause");
+	return 0;
+}
+
+void pp(vector<int>& a){
+	for (int i = 0; i < a.size(); ++i){
+		cout << a[i] << " ";
+	}
+	cout << endl;
+}
+// 将3张牌放在三个桶中具体方案
+
+// book[i] : 表示第 i 张牌是否被用过
+// box[idx] : 表示第idx个盒中装的第几张牌
+// idx : 表示当前处理的是第几个盒子
+void DFS1(vector<int>& book,vector<int>& box,int idx){
+	int n = book.size();// 表示一共有n张牌
+	for (int i = 0; i < n; ++i){
+		// 表示第 i 张牌还没有用过,目前可使用
+		if (book[i] == 0) {
+			box[idx] = i;
+			// 标记已经使用过
+			book[i] = 1;
+			// 处理完当前盒子就处理下一个盒子
+			DFS1(book, box, idx + 1);
+			if (idx+1 == 2){
+				pp(box);
+			}
+			book[i] = 0;
+		}
+	}
+}
+
+
+
+// 有n张牌，现在需要处理的是第idx个盒子
+// book[i] : =0，表示牌i没有被用过；=1，表示牌i已经使用过；
+// box[idx] : 盒子i中装的牌box[idx]
+void DFSN(vector<int>& book, vector<int>& box, int idx, int n){
+	for (int i = 0; i < n; ++i){
+		// 查看每一张牌：如果没有使用过就对这张牌进行处理
+		if (book[i] == 0){
+			// 将这张牌放在这个盒子里面
+			box[idx] = i;
+			// 标记这张牌已经被使用过
+			book[i] = 1;
+			// 处理下一个箱子
+			DFSN(book, box, idx + 1, n);
+			if (idx + 1 == n)
+				pp(box);
+			book[i] = 0;
+		}
+	}
+}
+
+
+
+/*
+假如有编号为1-3的3张牌和编号为1-3的3个盒子，现在需要将3张牌分别放到3个盒子种，且每个盒子只能放一张牌，一共有多少种不同的方法：
+1、当走到一个盒子面前的时候，到底要房哪一种牌？
+在这里应该把所有的牌都尝试一遍。假设这里约定 一个顺序，按牌面值从小到大依次尝试。
+在这样的假定下，当走到第一个盒子的时候，放入1号牌；
+2、放好之后，继续先后走，走到第二个盒子面前，此时还剩2张牌，牌面值最小为2的牌，按照约定的规则
+把2号牌放入第二个盒子种；
+3、此时，来到第三个盒子面前，只剩一张牌，放入第三个盒子。此时手中的牌已经用完；
+4、继续向后走，走到了盒子的尽头，后面再也没盒子，并且也没有可用的牌了，此时，一种方法已经完成了，
+但是这只是一种方法，这条路已经走到了尽头，这需要折返，重新回到了上一个盒子；
+5、这里回到第三个盒子，把第三个盒子种的牌取出来，再去尝试能否再放其他的牌，这时候手里只有一张3号牌，
+没有别的选择，所以还要继续向后回退，回到2号盒子面前；
+6、收回2号盒子种的二号牌，现在手里有2、3，按照约定，再把3号牌放入2号盒子，放好之后，继续向后走，来到了3号盒子；
+7、此时手里只有一张2号牌，把它放入3号盒，继续向后走；
+8、此时这条路又一次走到了尽头，一个新的方法产生了，继续向上折返，尝试其他可能，按照上述步骤，依次会产生所有结果；
+
+最主要的事情，向前面的盒子里放每一种牌，一个for循环搞定。这里还需考虑，现在手里有没有这张牌，用一个数组book标记手里是否有这张牌
+for(int i = 1 ;i <= n ;++i){
+	if(book[i]==0){ // 第 i 号牌仍在手上
+		box[indx]= i;
+		book[i] = 1 ;// 现在第 i 号牌已经被用过
+	}
+}
+
+// 面前的盒子处理完之后，继续处理下一个盒子，下一个盒子的处理方法和当前一样
+// 那么将上面代码封装一下，
+// indx 表示现在走到哪一个盒子面前
+void DFS(int idx,int n,vector<int>& box,vector<int>& book){
+	// 当第 n+1 个盒子的时候，表明已经走到了盒子的尽头
+	// 表明前面的盒子都已经放好了，这时候直接打印盒子种的牌即可，已经走到尽头，向上回退
+	if(idx==n+1){
+		for(int i = 0 ; i<n ;++i){
+		cout<<box[i]<<" ";
+		}
+		cout<<endl;
+		return ;// 向上回退
+	}
+	for(int i = 1 ; i<= n ; ++i){
+		if(book[i] == 0){
+			box[indx] = i ;
+			book[i] = 1;
+			// 当前盒子已经处理完毕，处理下一个盒子
+			//处理下一个盒子直接调用 DFS
+			DFS(idx+1,n,box,book) ;
+			// 从下一个盒子回退到当前盒子，取出当前盒子的牌
+			// 尝试放入其他牌
+			book[i]= 0;
+		}
+	}
+}
+*/
+
+
+
+// 一共n张牌，n个位置
+void DFS2(vector<int>& box, vector<int>& book, int idx, int n){
+	if (idx == n){
+		for (int i = 0; i < n; ++i)
+			cout << box[i] << " ";
+		cout << endl;
+		return;
+	}
+	for (int i = 1; i <= n; ++i){
+		if (book[i - 1] == 0){
+			box[idx] = i;
+			book[i - 1] = 1;
+			DFS2(box, book, idx + 1, n);
+			book[i - 1] = 0;
+		}
+	}
+}
+int main(){
+	vector<int> book(4, 0);
+	vector<int> box(4, 0);
+	int idx = 0;
+	DFS2(box,book, idx, 4);
+	system("pause");
+	return 0;
+}
